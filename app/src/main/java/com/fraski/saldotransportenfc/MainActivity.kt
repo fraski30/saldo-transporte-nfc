@@ -1,4 +1,4 @@
-package com.example.mifare_reader
+package com.fraski.saldotransportenfc
 
 import android.app.PendingIntent
 import android.content.Context
@@ -25,9 +25,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.room.*
-import com.example.mifare_reader.databinding.ActivityMainBinding
-import com.example.mifare_reader.databinding.ItemHistoryBinding
-import com.example.mifare_reader.db.*
+import com.fraski.saldotransportenfc.databinding.ActivityMainBinding
+import com.fraski.saldotransportenfc.databinding.ItemHistoryBinding
+import com.fraski.saldotransportenfc.db.*
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry

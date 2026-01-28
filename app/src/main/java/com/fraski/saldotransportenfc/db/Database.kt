@@ -1,4 +1,4 @@
-package com.example.mifare_reader.db
+package com.fraski.saldotransportenfc.db
 
 import androidx.room.*
 

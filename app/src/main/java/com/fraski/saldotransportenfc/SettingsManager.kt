@@ -1,4 +1,4 @@
-package com.example.mifare_reader
+package com.fraski.saldotransportenfc
 
 import android.content.Context
 import android.content.SharedPreferences
