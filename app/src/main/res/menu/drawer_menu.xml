@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_scan"
+            android:icon="@android:drawable/ic_menu_search"
+            android:title="Consultar Saldo" />
+        <item
+            android:id="@+id/nav_history"
+            android:icon="@android:drawable/ic_menu_recent_history"
+            android:title="Historial" />
+        <item
+            android:id="@+id/nav_charts"
+            android:icon="@android:drawable/ic_menu_gallery"
+            android:title="Gráfica de Gastos" />
+        <item
+            android:id="@+id/nav_settings"
+            android:icon="@android:drawable/ic_menu_preferences"
+            android:title="Configuración" />
+    </group>
+</menu>

@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Consulta de Saldo</string>
+    <string name="title_scan">Consultar Saldo</string>
+    <string name="title_history">Historial de Lecturas</string>
+</resources>
