@@ -5,20 +5,20 @@ plugins {
 }
 
 android {
-    namespace 'com.fraski.saldotransportenfc'
+    namespace 'com.fraskisoft.saldotransportenfc'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.fraski.saldotransportenfc"
+        applicationId "com.fraskisoft.saldotransportenfc"
         minSdk 29
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.1"
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

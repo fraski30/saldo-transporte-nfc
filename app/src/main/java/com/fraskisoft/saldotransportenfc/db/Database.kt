@@ -1,4 +1,4 @@
-package com.fraski.saldotransportenfc.db
+package com.fraskisoft.saldotransportenfc.db
 
 import androidx.room.*
 
@@ -8,7 +8,8 @@ data class HistoryRecord(
     val uid: String,
     val balance: Int,
     val date: String, // YYYY-MM-DD
-    val timestamp: Long
+    val timestamp: Long,
+    val cardType: Int = 0 // 0: Metro/Consorcio, 1: Bus Urbano
 )
 
 @Entity(tableName = "card_aliases")
@@ -45,7 +46,7 @@ interface HistoryDao {
     suspend fun getAllRaw(): List<HistoryRecord>
 }
 
-@Database(entities = [HistoryRecord::class, CardAlias::class], version = 2)
+@Database(entities = [HistoryRecord::class, CardAlias::class], version = 3)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun historyDao(): HistoryDao
 }

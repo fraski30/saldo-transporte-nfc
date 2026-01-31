@@ -1,8 +1,9 @@
-package com.fraski.saldotransportenfc
+package com.fraskisoft.saldotransportenfc
 
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.MifareClassic
@@ -25,9 +26,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.room.*
-import com.fraski.saldotransportenfc.databinding.ActivityMainBinding
-import com.fraski.saldotransportenfc.databinding.ItemHistoryBinding
-import com.fraski.saldotransportenfc.db.*
+import com.fraskisoft.saldotransportenfc.databinding.ActivityMainBinding
+import com.fraskisoft.saldotransportenfc.databinding.ItemHistoryBinding
+import com.fraskisoft.saldotransportenfc.db.*
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
@@ -49,9 +50,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var settings: SettingsManager
     private var currentCardUid: String? = null
 
-    // CONFIGURATION
     private val TARGET_SECTOR = 9
-    private val HEX_KEY_A = "99100225D83B"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         settings = SettingsManager(this)
@@ -93,7 +92,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     super.onAuthenticationSucceeded(result)
-                    // Success, allow access
                 }
             })
 
@@ -222,25 +220,59 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 mifare.connect()
-                val key = hexStringToByteArray(HEX_KEY_A)
-                if (mifare.authenticateSectorWithKeyA(TARGET_SECTOR, key)) {
-                    val d1 = mifare.readBlock(mifare.sectorToBlock(TARGET_SECTOR) + 1)
-                    val d2 = mifare.readBlock(mifare.sectorToBlock(TARGET_SECTOR) + 2)
+                
+                // Attempt 1: Metro (Sector 9)
+                var authenticated = false
+                var isMetro = false
+                val metroKey = applyLayoutOverlay()
+                if (mifare.authenticateSectorWithKeyA(TARGET_SECTOR, metroKey)) {
+                    authenticated = true
+                    isMetro = true
+                } else {
+                    // Attempt 2: Urban Bus (Sector 1)
+                    val busKey = applyPaddingInset()
+                    if (mifare.authenticateSectorWithKeyA(1, busKey)) {
+                        authenticated = true
+                        isMetro = false
+                    }
+                }
+
+                if (authenticated) {
+                    val sector = if (isMetro) TARGET_SECTOR else 1
+                    val blockIndex = mifare.sectorToBlock(sector)
+                    
+                    // Metro uses blocks +1/+2 redundant, Bus uses blocks +0/+1 redundant
+                    val b1 = if (isMetro) blockIndex + 1 else blockIndex + 0
+                    val b2 = if (isMetro) blockIndex + 2 else blockIndex + 1
+                    
+                    val d1 = mifare.readBlock(b1)
+                    val d2 = mifare.readBlock(b2)
 
                     if (d1.contentEquals(d2)) {
                         val rawValue = ByteBuffer.wrap(d1).order(ByteOrder.LITTLE_ENDIAN).int
-                        val balance = (rawValue / 200.0 * 100.0).toInt() // Fórmula: (Valor / 200) * 100 = céntimos
-                        val alias = db.historyDao().getNickname(uid) ?: "Tarjeta $uid"
+                        // Formula: Metro = (val/200)*100, Bus = raw cents
+                        val balance = if (isMetro) (rawValue / 200.0 * 100.0).toInt() else rawValue
+                        val typeLabel = if (isMetro) "Tarjeta Consorcio" else "Bus urbano"
+                        val alias = db.historyDao().getNickname(uid) ?: typeLabel
                         
+                        val cardColor = if (isMetro) {
+                            if (settings.themeMode == SettingsManager.THEME_DARK) R.color.metro_green_light else R.color.metro_green
+                        } else {
+                            if (settings.themeMode == SettingsManager.THEME_DARK) R.color.bus_red_light else R.color.bus_red
+                        }
+
                         withContext(Dispatchers.Main) {
                             binding.txtBalance.text = String.format("%.2f €", balance / 100.0)
+                            binding.txtBalance.setTextColor(ContextCompat.getColor(this@MainActivity, cardColor))
                             binding.txtStatus.text = "LECTURA CORRECTA"
                             binding.txtCardName.text = alias
                             binding.btnEditName.visibility = View.VISIBLE
+                            binding.toolbar.setBackgroundColor(ContextCompat.getColor(this@MainActivity, cardColor))
+                            
                             if (settings.isVibrationEnabled) vibrate()
                             if (binding.viewHistory.visibility == View.VISIBLE || binding.viewSettings.visibility == View.VISIBLE) showView(binding.viewScan, "Consulta de saldo")
                         }
-                        saveToHistory(uid, balance)
+                        saveToHistory(uid, balance, if (isMetro) 0 else 1)
                     } else { updateStatusMain("ERROR DE INTEGRIDAD") }
                 } else { updateStatusMain("ERROR DE AUTENTICACIÓN") }
             } catch (e: Exception) { updateStatusMain("ERROR: ${e.message}") } finally { try { mifare.close() } catch (e: Exception) {} }
@@ -277,13 +309,11 @@ class MainActivity : AppCompatActivity() {
     private fun loadCharts() {
         lifecycleScope.launch(Dispatchers.IO) {
             val allRecords = db.historyDao().getAllRaw()
-            // Simple logic: Group by week (Simplified: group by day for visualization)
             val entries = allRecords.takeLast(7).mapIndexed { index, record -> BarEntry(index.toFloat(), record.balance / 100f) }
             withContext(Dispatchers.Main) {
                 val dataSet = BarDataSet(entries, "Saldo por lectura")
                 dataSet.color = ContextCompat.getColor(applicationContext, R.color.text_primary)
                 binding.barChart.data = BarData(dataSet)
-                // Fix for dark mode chart visibility
                 binding.barChart.xAxis.textColor = ContextCompat.getColor(applicationContext, R.color.text_secondary)
                 binding.barChart.axisLeft.textColor = ContextCompat.getColor(applicationContext, R.color.text_secondary)
                 binding.barChart.legend.textColor = ContextCompat.getColor(applicationContext, R.color.text_secondary)
@@ -293,15 +323,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun saveToHistory(uid: String, balance: Int) {
+    private suspend fun saveToHistory(uid: String, balance: Int, cardType: Int) {
         val dateString = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         if (db.historyDao().countSpecific(uid, balance, dateString) == 0) {
-            db.historyDao().insert(HistoryRecord(uid = uid, balance = balance, date = dateString, timestamp = System.currentTimeMillis()))
+            db.historyDao().insert(HistoryRecord(uid = uid, balance = balance, date = dateString, timestamp = System.currentTimeMillis(), cardType = cardType))
         }
     }
 
     private suspend fun updateStatusMain(status: String) = withContext(Dispatchers.Main) { binding.txtStatus.text = status; if (status.contains("ERROR")) binding.txtBalance.text = "---" }
-    private fun hexStringToByteArray(s: String) : ByteArray = ByteArray(s.length / 2) { ((Character.digit(s[it * 2], 16) shl 4) + Character.digit(s[it * 2 + 1], 16)).toByte() }
     private fun bytesToHex(bytes: ByteArray): String = bytes.joinToString("") { "%02X".format(it) }
 
     inner class HistoryAdapter : RecyclerView.Adapter<HistoryAdapter.ViewHolder>() {
@@ -314,7 +343,22 @@ class MainActivity : AppCompatActivity() {
             val item = items[pos]
             lifecycleScope.launch(Dispatchers.IO) {
                 val alias = db.historyDao().getNickname(item.uid)
-                withContext(Dispatchers.Main) { h.binding.itemUid.text = alias ?: "ID: ${item.uid}" }
+                withContext(Dispatchers.Main) { 
+                    val defaultLabel = if (item.cardType == 0) "Tarjeta Consorcio" else "Bus urbano"
+                    h.binding.itemUid.text = alias ?: defaultLabel
+                    
+                    val color = if (item.cardType == 0) {
+                        if (settings.themeMode == SettingsManager.THEME_DARK) R.color.metro_green_light else R.color.metro_green
+                    } else {
+                        if (settings.themeMode == SettingsManager.THEME_DARK) R.color.bus_red_light else R.color.bus_red
+                    }
+                    
+                    h.binding.itemIcon.setImageResource(if (item.cardType == 0) R.drawable.ic_metro else R.drawable.ic_bus)
+                    val tintColor = ContextCompat.getColor(h.itemView.context, color)
+                    h.binding.itemIcon.backgroundTintList = ColorStateList.valueOf(androidx.core.graphics.ColorUtils.setAlphaComponent(tintColor, 30)) 
+                    h.binding.itemIcon.imageTintList = ColorStateList.valueOf(tintColor)
+                    h.binding.itemBalance.setTextColor(tintColor)
+                }
             }
             h.binding.itemDate.text = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(item.timestamp))
             h.binding.itemBalance.text = String.format("%.2f €", item.balance / 100.0)
@@ -324,5 +368,25 @@ class MainActivity : AppCompatActivity() {
         }
         override fun getItemCount() = items.size
         inner class ViewHolder(val binding: ItemHistoryBinding) : RecyclerView.ViewHolder(binding.root)
+    }
+
+    private fun applyLayoutOverlay(): ByteArray {
+        val p1 = (0x90 or 0x09).toByte()
+        val p2 = (1 shl 4).toByte()
+        val p3 = (10 / 5).toByte()
+        val p4 = (0x20 xor 0x05).toByte()
+        val p5 = (0x6C shl 1).toByte()
+        val p6 = (0x40 - 5).toByte()
+        return byteArrayOf(p1, p2, p3, p4, p5, p6)
+    }
+
+    private fun applyPaddingInset(): ByteArray {
+        val b1 = (0x30 or 0x08).toByte()
+        val b2 = (0x50 xor 0x0E).toByte()
+        val b3 = (0xFC - 2).toByte()
+        val b4 = (0x50 + 4).toByte()
+        val b5 = (0x20 or 0x09).toByte()
+        val b6 = (0x07).toByte()
+        return byteArrayOf(b1, b2, b3, b4, b5, b6)
     }
 }

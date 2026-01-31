@@ -1,4 +1,4 @@
-package com.fraski.saldotransportenfc
+package com.fraskisoft.saldotransportenfc
 
 import android.content.Context
 import android.content.SharedPreferences

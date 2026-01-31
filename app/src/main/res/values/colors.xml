@@ -7,4 +7,10 @@
     <color name="text_secondary">#636E72</color>
     <color name="view_bg">#F5F7FA</color>
     <color name="surface">#FFFFFF</color>
+
+    <!-- Brand Colors -->
+    <color name="metro_green">#2E7D32</color>
+    <color name="metro_green_light">#81C784</color>
+    <color name="bus_red">#C62828</color>
+    <color name="bus_red_light">#E57373</color>
 </resources>
